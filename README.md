@@ -19,5 +19,5 @@ helm upgrade --install \
   --set "global.secret.LITMUS_BACKEND_URL=http://litmusportal-server-service.litmus.svc.cluster.local:9002" \ # FOR SELF AGENT (SVC)
   --set "global.secret.LITMUS_USERNAME=admin" \
   --set "global.secret.LITMUS_PASSWORD=litmus" \
-  --set "global.secret.LITMUS_PROJECT_ID="69365cb3-0211-4262-8820-78056c8adb4c"
+  --set "global.secret.LITMUS_PROJECT_ID=69365cb3-0211-4262-8820-78056c8adb4c"
 ```
