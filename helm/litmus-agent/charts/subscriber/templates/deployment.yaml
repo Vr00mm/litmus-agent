@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "subscriber.fullname" . }}
+  labels:
+    {{- include "subscriber.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "subscriber.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "subscriber.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "subscriber.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-{{ .Chart.Name }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: vr00mm/litmus-agent:latest
+          envFrom:
+            - secretRef:
+                name: {{ .Values.global.agentConfigName }}
+          env:
+            - name: AGENT_NAME
+              value: {{ .Values.global.config.AGENT_NAME }}
+            - name: AGENT_DESCRIPTION
+              value: {{ .Values.global.config.AGENT_DESCRIPTION }}
+            - name: NAMESPACE
+              value: {{ .Release.Namespace }}
+            - name: APP_VERSION
+              value: {{ .Chart.AppVersion }}
+            - name: CONFIG_MAP_NAME
+              value: {{ .Values.global.agentConfigName }}
+            - name: SERVICE_ACCOUNT_NAME
+              value: {{ include "subscriber.serviceAccountName" . }}
+            - name: RELEASE_NAME
+              value: {{ .Release.Name }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Values.global.agentConfigName }}
+          env:
+            - name: AGENT_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
