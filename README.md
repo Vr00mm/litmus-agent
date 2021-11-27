@@ -24,3 +24,11 @@ helm upgrade --install \
   --set "global.secret.LITMUS_PASSWORD=litmus" \
   --set "global.secret.LITMUS_PROJECT_ID=69365cb3-0211-4262-8820-78056c8adb4c"
 ```
+
+## Next to come
+
+ - Use hooks instead init-container.<br>
+   It will permit to precreate agent into limuts before install and delete it before uninstall.
+
+ - Base helm resource from https://github.com/litmuschaos/litmus/tree/master/litmus-portal/graphql-server/manifests,<br>
+   It will permit to deal with cluster/namespace mode.
