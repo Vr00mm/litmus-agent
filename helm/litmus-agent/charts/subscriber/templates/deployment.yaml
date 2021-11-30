@@ -27,28 +27,6 @@ spec:
       serviceAccountName: {{ include "subscriber.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      initContainers:
-        - name: init-{{ .Chart.Name }}
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          image: vr00mm/litmus-agent:latest
-          envFrom:
-            - secretRef:
-                name: {{ .Values.global.agentConfigName }}
-          env:
-            - name: AGENT_NAME
-              value: {{ .Values.global.config.AGENT_NAME }}
-            - name: AGENT_DESCRIPTION
-              value: {{ .Values.global.config.AGENT_DESCRIPTION }}
-            - name: NAMESPACE
-              value: {{ .Release.Namespace }}
-            - name: APP_VERSION
-              value: {{ .Chart.AppVersion }}
-            - name: CONFIG_MAP_NAME
-              value: {{ .Values.global.agentConfigName }}
-            - name: SERVICE_ACCOUNT_NAME
-              value: {{ include "subscriber.serviceAccountName" . }}
-            - name: RELEASE_NAME
-              value: {{ .Release.Name }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

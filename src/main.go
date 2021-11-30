@@ -117,7 +117,8 @@ func GetAgentWithName(credentials types.Credentials, AgentName string) agentData
 	return agentData{}
 }
 
-func createConfigMap(configMapData map[string]string) {
+func createConfigMap(configmapName string, configMapData map[string]string) {
+        var err error
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		panic(err.Error())
@@ -134,17 +135,27 @@ func createConfigMap(configMapData map[string]string) {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1r.ObjectMeta{
-			Name:      CONFIG_MAP_NAME,
+			Name:      configmapName,
 			Namespace: NAMESPACE,
 		},
 		Data: configMapData,
 	}
 
 	var cm *corev1r.ConfigMap
-	if _, err := clientset.CoreV1().ConfigMaps(NAMESPACE).Get(context.TODO(), CONFIG_MAP_NAME, metav1r.GetOptions{}); errors.IsNotFound(err) {
-		cm, _ = clientset.CoreV1().ConfigMaps(NAMESPACE).Create(context.TODO(), &configMap, metav1r.CreateOptions{})
+	if _, err := clientset.CoreV1().ConfigMaps(NAMESPACE).Get(context.TODO(), configmapName, metav1r.GetOptions{}); errors.IsNotFound(err) {
+		cm, err = clientset.CoreV1().ConfigMaps(NAMESPACE).Create(context.TODO(), &configMap, metav1r.CreateOptions{})
+                if err != nil {
+                        utils.Red.Println("\n❌ Cannot create configmap " + configmapName +" : " + err.Error() + "\n")
+                        os.Exit(1)
+                }
+
 	} else {
-		cm, _ = clientset.CoreV1().ConfigMaps(NAMESPACE).Update(context.TODO(), &configMap, metav1r.UpdateOptions{})
+		cm, err = clientset.CoreV1().ConfigMaps(NAMESPACE).Update(context.TODO(), &configMap, metav1r.UpdateOptions{})
+                if err != nil {
+                        utils.Red.Println("\n❌ Cannot update configmap " + configmapName +" : " + err.Error() + "\n")
+                        os.Exit(1)
+                }
+
 	}
 	_ = cm
 }
@@ -195,6 +206,7 @@ func main() {
 
 	t := time.Now()
 	configMapData := make(map[string]string, 0)
+
 	configMapData["SERVER_ADDR"] = LITMUS_BACKEND_URL + "/query"
 	configMapData["VERSION"] = APP_VERSION
 	configMapData["IS_CLUSTER_CONFIRMED"] = "false"
@@ -203,6 +215,7 @@ func main() {
 	configMapData["COMPONENTS"] = "DEPLOYMENTS: " + test
 	configMapData["AGENT_SCOPE"] = newAgent.Mode
 
+        var clusterID string
 	agentExist := GetAgentWithName(credentials, newAgent.AgentName)
 	if (agentExist == agentData{}) {
 		utils.White_B.Println("\n🚀 Registering new agent !! 🎉")
@@ -218,8 +231,8 @@ func main() {
 			utils.Red.Println("\n❌ Agent connection failed, null response\n")
 			os.Exit(1)
 		}
-
-		configMapData["CLUSTER_ID"] = agent.Data.UserAgentReg.ClusterID
+		clusterID = agent.Data.UserAgentReg.ClusterID
+		configMapData["CLUSTER_ID"] = clusterID
 		reqCluster := GetAgentWithID(credentials, agent.Data.UserAgentReg.ClusterID)
 		if (reqCluster == agentData{}) {
 			utils.Red.Println("\n❌ Agent Registered failed: " + err.Error() + "\n")
@@ -231,14 +244,23 @@ func main() {
 
 		utils.White_B.Println("\n🚀 Agent Registered Successful!! 🎉")
 	} else {
+                clusterID = agentExist.ClusterID
+
 		utils.White_B.Println("\n🚀 Agent Already Registered!! 🎉")
 
-		configMapData["CLUSTER_ID"] = agentExist.ClusterID
+		configMapData["CLUSTER_ID"] = clusterID
 		configMapData["ACCESS_KEY"] = agentExist.AccessKey
-
 	}
 
-	createConfigMap(configMapData)
+
+	createConfigMap(CONFIG_MAP_NAME, configMapData)
+
+        configMapWorkflowController := make(map[string]string, 0)
+        configMapWorkflowController["config"] = `    containerRuntimeExecutor: k8sapi
+    executor:
+      imagePullPolicy: IfNotPresent
+    instanceID: ` + clusterID
+        createConfigMap("workflow-controller-configmap", configMapWorkflowController )
 
 	utils.White_B.Println("\n🚀 Agent Configured Successful!! 🎉")
 	utils.White_B.Println("\n🚀 Starting... 🎉")
