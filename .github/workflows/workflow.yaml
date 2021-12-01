@@ -275,7 +275,7 @@ jobs:
 
   helm-package-push:
     needs: [infos, helm-doc, docker-build-push]
-    if: ${{ always() && needs.helm-doc.outputs.STATUS == 'success' }}
+    if: ${{ always() && ( needs.helm-doc.outputs.STATUS == 'success' | needs.docker-build-push.outputs.STATUS == 'success' }}
     name: "🛠️ Package Helm Chart"
     runs-on: ubuntu-latest
     container:
