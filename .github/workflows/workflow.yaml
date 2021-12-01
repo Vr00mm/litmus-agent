@@ -175,7 +175,7 @@ jobs:
           tar xzvf helmdoc.tgz
           mv ./helm-docs /usr/local/bin && cd
 
-      - name: Download Jq
+      - name: Download Yq
         run: |
           cd /tmp
           wget -O yq.tgz https://github.com/mikefarah/yq/releases/download/v4.15.1/yq_linux_amd64.tar.gz
@@ -186,7 +186,7 @@ jobs:
         id: doc-gen
         run: |
           set -x
-          git config --local user.name "[CI/CD]:"
+          git config --local user.name "👮🏻[CI/CD]:"
           git config --local user.email ""
           echo ::set-output name=status::success
 
@@ -206,11 +206,12 @@ jobs:
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
-            git status
-            git add .
-            git commit -sm "Auto regenerate helm documentation"
-            git checkout ${currentBranch}
+            git add . |
+             && git commit -sm "Auto regenerate helm documentation" |
+             && git checkout ${currentBranch}
+
             git merge feature/${newFeature}
+
             git branch -d feature/${newFeature}
             git push
             echo ::set-output name=status::error
