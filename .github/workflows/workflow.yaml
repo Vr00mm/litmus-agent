@@ -191,8 +191,7 @@ jobs:
           echo ::set-output name=status::success
 
           currentBranch=${{ needs.infos.outputs.GITHUB_REF }}
-          currentBranch=${currentBranch##*/}
-
+          currentBranch=${currentBranch#refs/heads/*}
           newFeature=${currentBranch}-doc-update
 
           git checkout -b feature/${newFeature}
