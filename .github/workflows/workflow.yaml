@@ -206,9 +206,9 @@ jobs:
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
-            git add . |
-             && git commit -sm "Auto regenerate helm documentation" |
-             && git checkout ${currentBranch}
+            git add .
+            git commit -sm "Auto regenerate helm documentation"
+            git checkout ${currentBranch}
 
             git merge feature/${newFeature}
 
