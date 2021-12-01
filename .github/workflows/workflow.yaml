@@ -284,7 +284,7 @@ jobs:
           helm cm-push --force \
             --version "${APP_VERSION}"  \
             --app-version "${APP_VERSION}" \
-            "${GITHUB_WORKSPACE}/helm/${APP_NAME}" "${HELM_REPO}"
+            "${GITHUB_WORKSPACE}/helm/${APP_NAME}" private-registry
 
       - run: echo ::set-output name=status::success
         id: helm-package-status
@@ -294,7 +294,7 @@ jobs:
   deploy-dry-run:
     name: "🐋 Dry Run Deploy"
     needs: [infos, helm-package-push, docker-build-push]
-    if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/tags/v*') && needs.helm-package-push.outputs.STATUS == 'success' }}
+    if: ${{ always() && needs.helm-package-push.outputs.STATUS == 'success' }}
     runs-on: ubuntu-latest
     container:
       image: vr00mm/docker-helm-client:v0.2.0
