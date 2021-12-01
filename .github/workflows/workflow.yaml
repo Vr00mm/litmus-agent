@@ -161,6 +161,9 @@ jobs:
     needs: [infos, helm-lint]
     name: "📖 Helm documentation"
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.infos.outputs.NEXT_VERSION }}
+      APP_NAME: ${{ needs.infos.outputs.APP_NAME }}
     steps:
       - name: Load Workspace
         uses: actions/checkout@v2
