@@ -1,11 +1,11 @@
 name: Release
 on:
   workflow_dispatch:
-  inputs:
-    force-step:
-      description: Start from defined step    
-      required: true
-      default: "go-lint"
+    inputs:
+      force-step:
+        description: Start from defined step    
+        required: true
+        default: "go-lint"
   push:
     branches:
       - 'feature/**'
