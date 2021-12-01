@@ -82,8 +82,6 @@ jobs:
       GITHUB_RUN_NUMBER: ${{ steps.githubInfos.outputs.GITHUB_RUN_NUMBER }}
       GITHUB_WORKSPACE: ${{ steps.githubInfos.outputs.GITHUB_WORKSPACE }}
 
-      KUBE_ICN: ${{ steps.githubInfos.outputs.KUBE_ICN }}
-
 
   print-infos:
     needs: infos
@@ -164,6 +162,13 @@ jobs:
       - name: Load Workspace
         uses: actions/checkout@v2
 
+      - name: Download helm-docs
+        run: |
+          cd /tmp
+          wget -O helmdoc.tgz https://github.com/norwoodj/helm-docs/releases/download/v1.5.0/helm-docs_1.5.0_Linux_x86_64.tar.gz
+          tar xzvf helmdoc.tgz
+          mv ./helm-docs /usr/local/bin && cd
+
       - name: Generate Documentation
         id: doc-gen
         run: |
@@ -178,7 +183,7 @@ jobs:
           newFeature=${currentBranch}-doc-update
 
           git checkout -b feature/${newFeature}
-          ./bin/helm-docs -t README_chart.md.gotpl --chart-search-root ./helm|| github.event.inputs.force-step == "go-lint"
+          helm-docs -t README_chart.md.gotpl --chart-search-root ./helm
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
