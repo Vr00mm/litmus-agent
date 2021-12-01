@@ -1,9 +1,13 @@
 name: Release
 on:
   workflow_dispatch:
+  inputs:
+    force-step:
+      description: Start from defined step    
+      required: true
+      default: "go-lint"
   push:
     branches:
-      - 'master'
       - 'feature/**'
       - 'bugfix/**'
       - 'hotfix/**'
@@ -117,7 +121,7 @@ jobs:
 
   go-lint:
     needs: [infos]
-    if: ${{ needs.infos.outputs.APP_CHANGES == 'true' }}
+    if: ${{ needs.infos.outputs.APP_CHANGES == 'true' || github.event.inputs.force-step == "go-lint" }}
     name: "👮🏻‍ GoLint"
     runs-on: ubuntu-latest
     steps:
@@ -127,10 +131,14 @@ jobs:
         with:
           version: v1.29
           working-directory: "./src"
+      - run: echo ::set-output name=status::success
+        id: go-lint
+    outputs:
+      STATUS: ${{ steps.go-lint.outputs.status }}
 
   helm-lint:
     needs: [infos]
-    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.infos.outputs.APP_CHANGES == 'true' }}
+    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == "helm-lint" }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
     container:
@@ -170,7 +178,7 @@ jobs:
           newFeature=${currentBranch}-doc-update
 
           git checkout -b feature/${newFeature}
-          ./bin/helm-docs -t README_chart.md.gotpl --chart-search-root ./helm
+          ./bin/helm-docs -t README_chart.md.gotpl --chart-search-root ./helm|| github.event.inputs.force-step == "go-lint"
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
