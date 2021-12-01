@@ -197,12 +197,6 @@ jobs:
             echo ::set-output name=status::error
           fi
 
-      - name: Push changes # push the output folder to your repo
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          force: true
-
       - name: Result
         run: |
           [[ "${{steps.doc-gen.outputs.status == 'error' }}" ]] && echo "Generated Documentations"
@@ -277,12 +271,18 @@ jobs:
       - name: Load Workspace
         uses: actions/checkout@v2
 
+      - name: Add Helm Registry
+        run: |
+          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo update
+
       - name: Helm Push
         run: |
           helm cm-push --force \
             --version "${APP_VERSION}"  \
             --app-version "${APP_VERSION}" \
             "${GITHUB_WORKSPACE}/helm/${APP_NAME}" "${HELM_REPO}"
+
       - run: echo ::set-output name=status::success
         id: helm-package-status
     outputs:
