@@ -1,4 +1,4 @@
-name: Release
+name: CI/CD
 on:
   workflow_dispatch:
     inputs:
@@ -137,7 +137,7 @@ jobs:
       STATUS: ${{ steps.go-lint.outputs.status }}
 
   helm-lint:
-    needs: [infos]
+    needs: [infos, go-lint]
     if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint' }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
