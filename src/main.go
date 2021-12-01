@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"time"
+        "strconv"
 
 	"github.com/golang-jwt/jwt"
 	"github.com/litmuschaos/litmusctl/pkg/apis"
@@ -35,12 +37,14 @@ var (
 	SERVICE_ACCOUNT_NAME string
 	CONFIG_MAP_NAME      string
 	RELEASE_NAME         string
+	ACTION               string
 )
 
 type agentData struct {
 	ClusterID   string `json:"cluster_id"`
 	ClusterName string `json:"cluster_name"`
 	AccessKey   string `json:"access_key"`
+        IsClusterConfirmed bool `json:"is_cluster_confirmed"`
 }
 
 type agentResponse struct {
@@ -50,6 +54,8 @@ type agentResponse struct {
 }
 
 func init() {
+	flag.StringVar(&ACTION, "action", "", "create|delete litmus agent")
+	flag.Parse()
 	LITMUS_FRONTEND_URL = os.Getenv("LITMUS_FRONTEND_URL")
 	LITMUS_BACKEND_URL = os.Getenv("LITMUS_BACKEND_URL")
 
@@ -65,12 +71,13 @@ func init() {
 	APP_VERSION = os.Getenv("APP_VERSION")
 	CONFIG_MAP_NAME = os.Getenv("CONFIG_MAP_NAME")
 	SERVICE_ACCOUNT_NAME = os.Getenv("SERVICE_ACCOUNT_NAME")
+
 }
 
 func GetAgentList(c types.Credentials, project_id string) agentResponse {
 	var agentResp agentResponse
 
-	query := `{"query":"query{\n  getCluster(project_id: \"` + LITMUS_PROJECT_ID + `\" ){\n  cluster_id cluster_name access_key \n  }\n}"}`
+	query := `{"query":"query{\n  getCluster(project_id: \"` + LITMUS_PROJECT_ID + `\" ){\n  cluster_id cluster_name access_key is_cluster_confirmed \n  }\n}"}`
 	params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: c.Token}
 	resp, err := apis.SendRequest(params, []byte(query))
 	if err != nil {
@@ -118,15 +125,15 @@ func GetAgentWithName(credentials types.Credentials, AgentName string) agentData
 }
 
 func createConfigMap(configmapName string, configMapData map[string]string) {
-        var err error
+	var err error
 	config, err := rest.InClusterConfig()
 	if err != nil {
-		panic(err.Error())
+                utils.Red.Println("\n❌ Cannot create config from incluster: " + err.Error() + "\n")
 	}
 	// creates the clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+                utils.Red.Println("\n❌ Cannot create clientset: " + err.Error() + "\n")
 	}
 
 	configMap := corev1r.ConfigMap{
@@ -144,42 +151,23 @@ func createConfigMap(configmapName string, configMapData map[string]string) {
 	var cm *corev1r.ConfigMap
 	if _, err := clientset.CoreV1().ConfigMaps(NAMESPACE).Get(context.TODO(), configmapName, metav1r.GetOptions{}); errors.IsNotFound(err) {
 		cm, err = clientset.CoreV1().ConfigMaps(NAMESPACE).Create(context.TODO(), &configMap, metav1r.CreateOptions{})
-                if err != nil {
-                        utils.Red.Println("\n❌ Cannot create configmap " + configmapName +" : " + err.Error() + "\n")
-                        os.Exit(1)
-                }
+		if err != nil {
+			utils.Red.Println("\n❌ Cannot create configmap " + configmapName + " : " + err.Error() + "\n")
+			os.Exit(1)
+		}
 
 	} else {
 		cm, err = clientset.CoreV1().ConfigMaps(NAMESPACE).Update(context.TODO(), &configMap, metav1r.UpdateOptions{})
-                if err != nil {
-                        utils.Red.Println("\n❌ Cannot update configmap " + configmapName +" : " + err.Error() + "\n")
-                        os.Exit(1)
-                }
+		if err != nil {
+			utils.Red.Println("\n❌ Cannot update configmap " + configmapName + " : " + err.Error() + "\n")
+			os.Exit(1)
+		}
 
 	}
 	_ = cm
 }
 
-func main() {
-	var authInput types.AuthInput
-	authInput.Endpoint = LITMUS_FRONTEND_URL
-	authInput.Username = LITMUS_USERNAME
-	authInput.Password = LITMUS_PASSWORD
-
-	resp, err := apis.Auth(authInput)
-	utils.PrintError(err)
-	// Decoding token
-	token, _ := jwt.Parse(resp.AccessToken, nil)
-	if token == nil {
-		utils.Red.Println("\n❌ Cannot get token for user: " + authInput.Username + "\n")
-		os.Exit(1)
-	}
-
-	var credentials types.Credentials
-	credentials.Username = authInput.Username
-	credentials.Endpoint = authInput.Endpoint
-	credentials.Token = resp.AccessToken
-
+func createAgent(credentials types.Credentials) {
 	var newAgent types.Agent
 	newAgent.AgentName = AGENT_NAME
 	newAgent.Namespace = NAMESPACE
@@ -206,7 +194,6 @@ func main() {
 
 	t := time.Now()
 	configMapData := make(map[string]string, 0)
-
 	configMapData["SERVER_ADDR"] = LITMUS_BACKEND_URL + "/query"
 	configMapData["VERSION"] = APP_VERSION
 	configMapData["IS_CLUSTER_CONFIRMED"] = "false"
@@ -215,7 +202,7 @@ func main() {
 	configMapData["COMPONENTS"] = "DEPLOYMENTS: " + test
 	configMapData["AGENT_SCOPE"] = newAgent.Mode
 
-        var clusterID string
+	var clusterID string
 	agentExist := GetAgentWithName(credentials, newAgent.AgentName)
 	if (agentExist == agentData{}) {
 		utils.White_B.Println("\n🚀 Registering new agent !! 🎉")
@@ -244,26 +231,89 @@ func main() {
 
 		utils.White_B.Println("\n🚀 Agent Registered Successful!! 🎉")
 	} else {
-                clusterID = agentExist.ClusterID
+		clusterID = agentExist.ClusterID
 
 		utils.White_B.Println("\n🚀 Agent Already Registered!! 🎉")
 
 		configMapData["CLUSTER_ID"] = clusterID
 		configMapData["ACCESS_KEY"] = agentExist.AccessKey
-	}
+                configMapData["IS_CLUSTER_CONFIRMED"] = strconv.FormatBool(agentExist.IsClusterConfirmed)
 
+	}
 
 	createConfigMap(CONFIG_MAP_NAME, configMapData)
 
-        configMapWorkflowController := make(map[string]string, 0)
-        configMapWorkflowController["config"] = `    containerRuntimeExecutor: k8sapi
+	configMapWorkflowController := make(map[string]string, 0)
+	configMapWorkflowController["config"] = `    containerRuntimeExecutor: k8sapi
     executor:
       imagePullPolicy: IfNotPresent
     instanceID: ` + clusterID
-        createConfigMap("workflow-controller-configmap", configMapWorkflowController )
+	createConfigMap("workflow-controller-configmap", configMapWorkflowController)
 
 	utils.White_B.Println("\n🚀 Agent Configured Successful!! 🎉")
 	utils.White_B.Println("\n🚀 Starting... 🎉")
+}
+
+func deleteAgent(credentials types.Credentials) {
+        var err error
+        config, err := rest.InClusterConfig()
+        if err != nil {
+                utils.Red.Println("\n❌ Cannot create config from incluster: " + err.Error() + "\n")
+        }
+        // creates the clientset
+        clientset, err := kubernetes.NewForConfig(config)
+        if err != nil {
+                utils.Red.Println("\n❌ Cannot create clientset: " + err.Error() + "\n")
+        }
+
+	var cm *corev1r.ConfigMap
+	if _, err := clientset.CoreV1().ConfigMaps(NAMESPACE).Get(context.TODO(), CONFIG_MAP_NAME, metav1r.GetOptions{}); errors.IsNotFound(err) {
+		utils.Red.Println("\n❌ Cannot delete agent: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+	CLUSTER_ID := cm.Data["CLUSTER_ID"]
+	query := `{"query":"mutation {\n  deleteClusterReg(clusterInput: \n    { \n    cluster_name: \"` + CLUSTER_ID + `\"  }){\n    cluster_id  }\n}"}`
+	params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: credentials.Token}
+	resp, err := apis.SendRequest(params, []byte(query))
+	if err != nil {
+		utils.Red.Println("Error in getting agent list: ", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		utils.Red.Println("\n🎉 Sucessfull deleted agent" + "\n")
+	} else {
+		utils.Red.Println("\n❌ Cannot delete agent: " + err.Error() + "\n")
+		os.Exit(1)
+	}
+}
+
+func main() {
+	var authInput types.AuthInput
+	authInput.Endpoint = LITMUS_FRONTEND_URL
+	authInput.Username = LITMUS_USERNAME
+	authInput.Password = LITMUS_PASSWORD
+
+	resp, err := apis.Auth(authInput)
+	utils.PrintError(err)
+	// Decoding token
+	token, _ := jwt.Parse(resp.AccessToken, nil)
+	if token == nil {
+		utils.Red.Println("\n❌ Cannot get token for user: " + authInput.Username + "\n")
+		os.Exit(1)
+	}
+
+	var credentials types.Credentials
+	credentials.Username = authInput.Username
+	credentials.Endpoint = authInput.Endpoint
+	credentials.Token = resp.AccessToken
+
+	if ACTION == "create" {
+		createAgent(credentials)
+	} else if ACTION == "delete" {
+		deleteAgent(credentials)
+	} else {
+		utils.Red.Println("\n❌ Please choose an action, delete or create\n")
+	}
 }
 
 // agent.AgentName
