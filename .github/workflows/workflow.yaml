@@ -273,7 +273,7 @@ jobs:
 
       - name: Add Helm Registry
         run: |
-          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
           helm repo update
 
       - name: Helm Push
@@ -313,7 +313,7 @@ jobs:
 
       - name: Add Helm Registry
         run: |
-          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
           helm repo update
 
       - name: Deploy Dry-Run
@@ -353,7 +353,7 @@ jobs:
 
       - name: Add Helm Registry
         run: |
-          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
           helm repo update
 
       - name: Deploy Dry-Run
