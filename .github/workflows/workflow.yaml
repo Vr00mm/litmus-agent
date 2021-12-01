@@ -172,6 +172,11 @@ jobs:
           tar xzvf helmdoc.tgz
           mv ./helm-docs /usr/local/bin && cd
 
+      - name Download Jq
+        run: |
+          wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY}.tar.gz -O - |\
+            tar xz && mv ${BINARY} /usr/bin/yq
+
       - name: Generate Documentation
         id: doc-gen
         run: |
@@ -186,6 +191,12 @@ jobs:
           newFeature=${currentBranch}-doc-update
 
           git checkout -b feature/${newFeature}
+
+          yq e -i "
+            .version = \"${APP_VERSION}\" |
+            .appVersion = \"${APP_VERSION}\"
+          " ./helm/${APP_NAME}/Chart.yaml
+
           helm-docs -t README_chart.md.gotpl --chart-search-root ./helm
           
           diff=`git diff |wc -l`
@@ -321,7 +332,7 @@ jobs:
 
       - name: Deploy Dry-Run
         run: |
-          helm upgrade --install "${APP_NAME}" "private-registry/${APP_NAME}" --namespace "${APP_NAME}" --create-namespace --dry-run
+          helm upgrade --install "${APP_NAME}" "private-registry/${APP_NAME}" --version ${APP_VERSION} --devel --namespace "${APP_NAME}" --create-namespace --dry-run
 
       - run: echo ::set-output name=status::success
         id: dryrun-status
