@@ -193,7 +193,7 @@ func createAgent(credentials types.Credentials) {
 	newAgent.NsExists = true
 
 	t := time.Now()
-	configMapData := make(map[string]string, 0)
+	configMapData := make(map[string]string)
 	configMapData["SERVER_ADDR"] = LITMUS_BACKEND_URL + "/query"
 	configMapData["VERSION"] = APP_VERSION
 	configMapData["IS_CLUSTER_CONFIRMED"] = "false"
@@ -215,7 +215,7 @@ func createAgent(credentials types.Credentials) {
 		// Print error message in case Data field is null in response
 		if (agent.Data == apis.AgentConnect{}) {
 			utils.PrintInJsonFormat(agent)
-			utils.Red.Println("\n❌ Agent connection failed, null response\n")
+			utils.Red.Println("\n❌ Agent connection failed, null response")
 			os.Exit(1)
 		}
 		clusterID = agent.Data.UserAgentReg.ClusterID
@@ -243,7 +243,7 @@ func createAgent(credentials types.Credentials) {
 
 	createConfigMap(CONFIG_MAP_NAME, configMapData)
 
-	configMapWorkflowController := make(map[string]string, 0)
+	configMapWorkflowController := make(map[string]string)
 	configMapWorkflowController["config"] = `    containerRuntimeExecutor: k8sapi
     executor:
       imagePullPolicy: IfNotPresent
@@ -312,7 +312,7 @@ func main() {
 	} else if ACTION == "delete" {
 		deleteAgent(credentials)
 	} else {
-		utils.Red.Println("\n❌ Please choose an action, delete or create\n")
+		utils.Red.Println("\n❌ Please choose an action, delete or create")
 	}
 }
 
