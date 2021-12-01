@@ -139,7 +139,7 @@ jobs:
 
   helm-lint:
     needs: [infos, go-lint]
-    if: ${{ always && (needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint') }}
+    if: ${{ always() && (needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint') }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
     container:
