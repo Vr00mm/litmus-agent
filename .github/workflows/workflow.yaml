@@ -175,7 +175,7 @@ jobs:
       - name: Download Jq
         run: |
           cd /tmp
-          wget -O jq.tgz https://github.com/mikefarah/yq/releases/download/v4.15.1/yq_linux_amd64.tar.gz
+          wget -O yq.tgz https://github.com/mikefarah/yq/releases/download/v4.15.1/yq_linux_amd64.tar.gz
           tar xzvf yq.tgz
           mv yq_linux_amd64 /usr/bin/yq && cd
 
@@ -272,7 +272,7 @@ jobs:
 
   helm-package-push:
     needs: [infos, helm-doc, docker-build-push]
-    if: ${{ always() && needs.helm-lint.outputs.STATUS == 'success' }}
+    if: ${{ always() && needs.helm-doc.outputs.STATUS == 'success' }}
     name: "🛠️ Package Helm Chart"
     runs-on: ubuntu-latest
     container:
