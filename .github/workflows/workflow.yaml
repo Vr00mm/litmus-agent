@@ -36,6 +36,7 @@ jobs:
         run: |
           APP_REPO=`echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]' | awk -F/ '{print $1}'`
           echo "::set-output name=APP_REPO::${APP_REPO}"
+
       - uses: dorny/paths-filter@v2
         id: appChanges
         with:
@@ -49,11 +50,13 @@ jobs:
           filters: |
             src:
               - 'helm/**'
+
       - name: Get-AppName
         id: appName
         run: |
           APP_NAME=`echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]' | awk -F/ '{print $2}'`
           echo "::set-output name=APP_NAME::${APP_NAME}"
+
       - name: Get-GithubInfos
         id: githubInfos
         run: |
@@ -136,7 +139,7 @@ jobs:
 
   helm-lint:
     needs: [infos, go-lint]
-    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint' }}
+    if: ${{ always && (needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint') }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
     container:
