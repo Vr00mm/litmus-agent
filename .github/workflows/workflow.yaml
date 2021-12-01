@@ -121,10 +121,10 @@ jobs:
 
   go-lint:
     needs: [infos]
-    if: ${{ needs.infos.outputs.APP_CHANGES == 'true' || github.event.inputs.force-step == "go-lint" }}
+    if: ${{ needs.infos.outputs.APP_CHANGES == 'true' || github.event.inputs.force-step == 'go-lint' }}
     name: "👮🏻‍ GoLint"
     runs-on: ubuntu-latest
-    steps:
+    steps: 
       - uses: actions/checkout@v2
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v2
@@ -138,7 +138,7 @@ jobs:
 
   helm-lint:
     needs: [infos]
-    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == "helm-lint" }}
+    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint' }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
     container:
