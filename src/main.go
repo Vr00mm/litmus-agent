@@ -38,7 +38,7 @@ var (
 	CONFIG_MAP_NAME      string
 	RELEASE_NAME         string
 	ACTION               string
-	
+
 	CLUSTER_ID	     string
 )
 
@@ -73,7 +73,7 @@ func init() {
 	APP_VERSION = os.Getenv("APP_VERSION")
 	CONFIG_MAP_NAME = os.Getenv("CONFIG_MAP_NAME")
 	SERVICE_ACCOUNT_NAME = os.Getenv("SERVICE_ACCOUNT_NAME")
-	
+
 	CLUSTER_ID = os.Getenv("CLUSTER_ID")
 
 }
@@ -261,8 +261,9 @@ func createAgent(credentials types.Credentials) {
 func deleteAgent(credentials types.Credentials) {
         utils.White_B.Println("\n🚀 Delete cluster!! 🎉")
 
-	query := `{"query":"mutation {\n  deleteClusterReg(clusterInput: \n    { \n    cluster_id: \"` + CLUSTER_ID + `\",\n  }){ cluster_id\n }\n}"}`
-	params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: credentials.Token}
+	//query := `{"query":"mutation {\n  deleteClusterReg(clusterInput: \n    { \n    cluster_id: \"` + CLUSTER_ID + `\",\n  }){ cluster_id\n }\n}"}`
+	query := `{"operationName":"deleteCluster","variables":{"cluster_id":"` + CLUSTER_ID + `"},"query":"mutation deleteCluster($cluster_id: String\u0021) {\\n  deleteClusterReg(cluster_id: $cluster_id)\\n}\\n"}`
+        params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: credentials.Token}
 	resp, err := apis.SendRequest(params, []byte(query))
 	if err != nil {
 		utils.Red.Println("Error in getting agent list: ", err)
