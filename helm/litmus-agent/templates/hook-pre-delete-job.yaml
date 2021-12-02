@@ -30,8 +30,8 @@ spec:
         envFrom:
           - secretRef:
               name: {{ include "litmus-agent.fullname" . }}-hook
-          - secretRef:
-              name: {{ include "litmus-agent.fullname" . }}-hook
+          - configMapRef:
+              name: "agent-config"
         env:
           - name: AGENT_NAME
             value: {{ .Values.AGENT_NAME }}

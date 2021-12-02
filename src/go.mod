@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/golang-jwt/jwt v3.2.1+incompatible
-	github.com/litmuschaos/litmusctl v0.6.0
+	github.com/litmuschaos/litmusctl v0.5.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
 	k8s.io/client-go v0.20.4
