@@ -202,13 +202,16 @@ jobs:
             .appVersion = \"${APP_VERSION}\"
           " ./helm/${APP_NAME}/Chart.yaml
 
+          git add .
+          git commit -sm "Bump helm chart"
+
           helm-docs -t README_chart.md.gotpl --chart-search-root ./helm
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
             git status
             git add .
-            git commit -sm "Auto regenerate helm documentation"
+            git commit -sm "Generate helm documentation"
             git checkout ${currentBranch}
             git merge feature/${newFeature}
             git branch -d feature/${newFeature}
