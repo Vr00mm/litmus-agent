@@ -5,7 +5,7 @@ on:
       force-step:
         description: Start from defined step    
         required: true
-        default: "go-lint"
+        default: ""
   push:
     branches:
       - 'feature/**'
