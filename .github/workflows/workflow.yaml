@@ -5,18 +5,20 @@ on:
       force-step:
         description: Start from defined step    
         required: true
-        default: "go-lint"
+        default: ""
   push:
     branches:
       - 'feature/**'
       - 'bugfix/**'
       - 'hotfix/**'
       - 'support/**'
-  pull_request:
-    branches:
-      - 'master'
-      - 'main'
       - 'develop'
+      - 'master'
+#  pull_request:
+#    branches:
+#      - 'master'
+#      - 'main'
+#      - 'develop'
 
 jobs:
   infos:
@@ -29,13 +31,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
       - name: Get-Version
-        uses: vr00mm/github-action-semver@v0.9.2
+        uses: vr00mm/github-action-semver@v0.9.4
         id: get-version
       - name: Get-AppRepo
         id: appRepo
         run: |
           APP_REPO=`echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]' | awk -F/ '{print $1}'`
           echo "::set-output name=APP_REPO::${APP_REPO}"
+
       - uses: dorny/paths-filter@v2
         id: appChanges
         with:
@@ -49,11 +52,13 @@ jobs:
           filters: |
             src:
               - 'helm/**'
+
       - name: Get-AppName
         id: appName
         run: |
           APP_NAME=`echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]' | awk -F/ '{print $2}'`
           echo "::set-output name=APP_NAME::${APP_NAME}"
+
       - name: Get-GithubInfos
         id: githubInfos
         run: |
@@ -63,8 +68,6 @@ jobs:
           echo "::set-output name=GITHUB_SHA::${GITHUB_SHA}"
           echo "::set-output name=GITHUB_RUN_NUMBER::${GITHUB_RUN_NUMBER}"
           echo "::set-output name=GITHUB_WORKSPACE::${GITHUB_WORKSPACE}"
-
-          echo "::set-output name=KUBE_ICN::$'\360\237\220\263'"
 
     outputs:
       CURRENT_VERSION: ${{ steps.get-version.outputs.CURRENT_VERSION }}
@@ -136,7 +139,7 @@ jobs:
 
   helm-lint:
     needs: [infos, go-lint]
-    if: ${{ needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint' }}
+    if: ${{ always() && (needs.infos.outputs.CHART_CHANGES == 'true' || needs.go-lint.outputs.STATUS == 'success' || github.event.inputs.force-step == 'helm-lint') }}
     name: "👮🏻‍ HelmLint"
     runs-on: ubuntu-latest
     container:
@@ -158,6 +161,9 @@ jobs:
     needs: [infos, helm-lint]
     name: "📖 Helm documentation"
     runs-on: ubuntu-latest
+    env:
+      APP_VERSION: ${{ needs.infos.outputs.NEXT_VERSION }}
+      APP_NAME: ${{ needs.infos.outputs.APP_NAME }}
     steps:
       - name: Load Workspace
         uses: actions/checkout@v2
@@ -169,39 +175,39 @@ jobs:
           tar xzvf helmdoc.tgz
           mv ./helm-docs /usr/local/bin && cd
 
+      - name: Download Yq
+        run: |
+          cd /tmp
+          wget -O yq.tgz https://github.com/mikefarah/yq/releases/download/v4.15.1/yq_linux_amd64.tar.gz
+          tar xzvf yq.tgz
+          mv yq_linux_amd64 /usr/local/bin/yq && cd
+
       - name: Generate Documentation
         id: doc-gen
         run: |
           set -x
-          git config --local user.name "[CI/CD]:"
+          git config --local user.name "👮🏻[CI/CD]:"
           git config --local user.email ""
           echo ::set-output name=status::success
 
           currentBranch=${{ needs.infos.outputs.GITHUB_REF }}
-          currentBranch=${currentBranch##*/}
-
+          currentBranch=${currentBranch#refs/heads/*}
           newFeature=${currentBranch}-doc-update
 
-          git checkout -b feature/${newFeature}
+          yq e -i "
+            .version = \"${APP_VERSION}\" |
+            .appVersion = \"${APP_VERSION}\"
+          " ./helm/${APP_NAME}/Chart.yaml
+
           helm-docs -t README_chart.md.gotpl --chart-search-root ./helm
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
-            git status
             git add .
             git commit -sm "Auto regenerate helm documentation"
-            git checkout ${currentBranch}
-            git merge feature/${newFeature}
-            git branch -d feature/${newFeature}
             git push
             echo ::set-output name=status::error
           fi
-
-      - name: Push changes # push the output folder to your repo
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          force: true
 
       - name: Result
         run: |
@@ -262,7 +268,7 @@ jobs:
 
   helm-package-push:
     needs: [infos, helm-doc, docker-build-push]
-    if: ${{ always() && needs.helm-lint.outputs.STATUS == 'success' }}
+    if: ${{ always() && ( needs.helm-doc.outputs.STATUS == 'success' || needs.docker-build-push.outputs.STATUS == 'success' ) }}
     name: "🛠️ Package Helm Chart"
     runs-on: ubuntu-latest
     container:
@@ -277,12 +283,18 @@ jobs:
       - name: Load Workspace
         uses: actions/checkout@v2
 
+      - name: Add Helm Registry
+        run: |
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo update
+
       - name: Helm Push
         run: |
           helm cm-push --force \
             --version "${APP_VERSION}"  \
             --app-version "${APP_VERSION}" \
-            "${GITHUB_WORKSPACE}/helm/${APP_NAME}" "${HELM_REPO}"
+            "${GITHUB_WORKSPACE}/helm/${APP_NAME}" private-registry
+
       - run: echo ::set-output name=status::success
         id: helm-package-status
     outputs:
@@ -291,7 +303,7 @@ jobs:
   deploy-dry-run:
     name: "🐋 Dry Run Deploy"
     needs: [infos, helm-package-push, docker-build-push]
-    if: ${{ always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/tags/v*') && needs.helm-package-push.outputs.STATUS == 'success' }}
+    if: ${{ always() && needs.helm-package-push.outputs.STATUS == 'success' }}
     runs-on: ubuntu-latest
     container:
       image: vr00mm/docker-helm-client:v0.2.0
@@ -313,12 +325,12 @@ jobs:
 
       - name: Add Helm Registry
         run: |
-          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
           helm repo update
 
       - name: Deploy Dry-Run
         run: |
-          helm upgrade --install "${APP_NAME}" "private-registry/${APP_NAME}" --namespace "${APP_NAME}" --create-namespace --dry-run
+          helm upgrade --install "${APP_NAME}" "private-registry/${APP_NAME}" --version ${APP_VERSION} --devel --namespace "${APP_NAME}" --create-namespace --dry-run
 
       - run: echo ::set-output name=status::success
         id: dryrun-status
@@ -353,7 +365,7 @@ jobs:
 
       - name: Add Helm Registry
         run: |
-          helm repo add private-registry "${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
+          helm repo add private-registry "https://${HELM_REPO}" --username ${HELM_REPO_USERNAME} --password ${HELM_REPO_PASSWORD}
           helm repo update
 
       - name: Deploy Dry-Run
@@ -365,19 +377,28 @@ jobs:
     outputs:
       STATUS: ${{ steps.deploy-status.outputs.status }}
 
-  release:
-#    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+  publish-release:
     if: contains(github.ref, 'refs/tags/')
     name: "🌏 Release"
     needs: [infos, deploy]
     runs-on: ubuntu-latest
-    container:
-      image: vr00mm/docker-helm-client:v0.1.0
-      env:
-        ENV_VAR: test-helm
     steps:
-      - name: helm dry-run
-        run: helm upgrade install package-version-1.0.0.tgz
+      - name: Load Workspace
+        uses: actions/checkout@v2
+
+      - name: Prepare changelog
+        run: |
+          TAGS=$(git tag -l)
+          if [[ TAGS != "" ]]
+          then
+             git log $(git describe --tags --abbrev=0)..HEAD --oneline |grep -v "[CI/CD]" |grep -v "[NO_LOG]" > changelog.txt
+          else
+             git log HEAD --oneline |grep -v "[CI/CD]" |grep -v "[NO_LOG]" > changelog.txt
+          fi
+
+      - name: Create new release
+        run: |
+          gh create release ${{ needs.infos.outputs.NEXT_VERSION }} --notes-file changelog.txt
 
   post-always:
     name: "🚘 Result"

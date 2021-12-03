@@ -39,6 +39,8 @@ spec:
             - configMapRef:
                 name: {{ .Values.global.agentConfigName }}
           env:
+            - name: VERSION
+              value: 2.3.0
             - name: AGENT_NAMESPACE
               valueFrom:
                 fieldRef:

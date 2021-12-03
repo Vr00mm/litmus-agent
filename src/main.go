@@ -38,6 +38,8 @@ var (
 	CONFIG_MAP_NAME      string
 	RELEASE_NAME         string
 	ACTION               string
+
+	CLUSTER_ID	     string
 )
 
 type agentData struct {
@@ -71,6 +73,8 @@ func init() {
 	APP_VERSION = os.Getenv("APP_VERSION")
 	CONFIG_MAP_NAME = os.Getenv("CONFIG_MAP_NAME")
 	SERVICE_ACCOUNT_NAME = os.Getenv("SERVICE_ACCOUNT_NAME")
+
+	CLUSTER_ID = os.Getenv("CLUSTER_ID")
 
 }
 
@@ -255,36 +259,26 @@ func createAgent(credentials types.Credentials) {
 }
 
 func deleteAgent(credentials types.Credentials) {
-        var err error
-        config, err := rest.InClusterConfig()
-        if err != nil {
-                utils.Red.Println("\n❌ Cannot create config from incluster: " + err.Error() + "\n")
-        }
-        // creates the clientset
-        clientset, err := kubernetes.NewForConfig(config)
-        if err != nil {
-                utils.Red.Println("\n❌ Cannot create clientset: " + err.Error() + "\n")
-        }
+        utils.White_B.Println("\n🚀 Delete cluster!! 🎉")
 
-	var cm *corev1r.ConfigMap
-	if _, err := clientset.CoreV1().ConfigMaps(NAMESPACE).Get(context.TODO(), CONFIG_MAP_NAME, metav1r.GetOptions{}); errors.IsNotFound(err) {
-		utils.Red.Println("\n❌ Cannot delete agent: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-	CLUSTER_ID := cm.Data["CLUSTER_ID"]
-	query := `{"query":"mutation {\n  deleteClusterReg(clusterInput: \n    { \n    cluster_name: \"` + CLUSTER_ID + `\"  }){\n    cluster_id  }\n}"}`
-	params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: credentials.Token}
+	//query := `{"query":"mutation {\n  deleteClusterReg(clusterInput: \n    { \n    cluster_id: \"` + CLUSTER_ID + `\",\n  }){ cluster_id\n }\n}"}`
+	query := `{"operationName":"deleteCluster","variables":{"cluster_id":"` + CLUSTER_ID + `"},"query":"mutation deleteCluster($cluster_id: String\u0021) {\\n  deleteClusterReg(cluster_id: $cluster_id)\\n}\\n"}`
+        params := apis.SendRequestParams{Endpoint: LITMUS_BACKEND_URL + "/query", Token: credentials.Token}
 	resp, err := apis.SendRequest(params, []byte(query))
 	if err != nil {
 		utils.Red.Println("Error in getting agent list: ", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == http.StatusOK {
-		utils.Red.Println("\n🎉 Sucessfull deleted agent" + "\n")
-	} else {
-		utils.Red.Println("\n❌ Cannot delete agent: " + err.Error() + "\n")
 		os.Exit(1)
 	}
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	if err != nil {
+		utils.Red.Println("Error in getting agent list: ", err)
+		os.Exit(1)
+	}
+	_ = bodyBytes
+        utils.White_B.Println("\n🚀 Agent deleted Successful!! 🎉")
+
 }
 
 func main() {
@@ -308,8 +302,10 @@ func main() {
 	credentials.Token = resp.AccessToken
 
 	if ACTION == "create" {
+                utils.White_B.Println("\n🚀 Start Pre install hook ... 🎉")
 		createAgent(credentials)
 	} else if ACTION == "delete" {
+                utils.White_B.Println("\n🚀 Start Pre delete hook ... 🎉")
 		deleteAgent(credentials)
 	} else {
 		utils.Red.Println("\n❌ Please choose an action, delete or create")

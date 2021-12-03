@@ -27,8 +27,5 @@ helm upgrade --install \
 
 ## Next to come
 
- - Use hooks instead init-container.<br>
-   It will permit to precreate agent into limuts before install and delete it before uninstall.
-
  - Base helm resource from https://github.com/litmuschaos/litmus/tree/master/litmus-portal/graphql-server/manifests,<br>
    It will permit to deal with cluster/namespace mode.
