@@ -12,11 +12,13 @@ on:
       - 'bugfix/**'
       - 'hotfix/**'
       - 'support/**'
-  pull_request:
-    branches:
-      - 'master'
-      - 'main'
       - 'develop'
+      - 'master'
+#  pull_request:
+#    branches:
+#      - 'master'
+#      - 'main'
+#      - 'develop'
 
 jobs:
   infos:
