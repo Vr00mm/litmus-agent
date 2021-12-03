@@ -5,18 +5,20 @@ on:
       force-step:
         description: Start from defined step    
         required: true
-        default: "go-lint"
+        default: ""
   push:
     branches:
       - 'feature/**'
       - 'bugfix/**'
       - 'hotfix/**'
       - 'support/**'
-  pull_request:
-    branches:
-      - 'master'
-      - 'main'
       - 'develop'
+      - 'master'
+#  pull_request:
+#    branches:
+#      - 'master'
+#      - 'main'
+#      - 'develop'
 
 jobs:
   infos:
@@ -66,8 +68,6 @@ jobs:
           echo "::set-output name=GITHUB_SHA::${GITHUB_SHA}"
           echo "::set-output name=GITHUB_RUN_NUMBER::${GITHUB_RUN_NUMBER}"
           echo "::set-output name=GITHUB_WORKSPACE::${GITHUB_WORKSPACE}"
-
-          echo "::set-output name=KUBE_ICN::$'\360\237\220\263'"
 
     outputs:
       CURRENT_VERSION: ${{ steps.get-version.outputs.CURRENT_VERSION }}
@@ -175,7 +175,7 @@ jobs:
           tar xzvf helmdoc.tgz
           mv ./helm-docs /usr/local/bin && cd
 
-      - name: Download Jq
+      - name: Download Yq
         run: |
           cd /tmp
           wget -O yq.tgz https://github.com/mikefarah/yq/releases/download/v4.15.1/yq_linux_amd64.tar.gz
@@ -186,16 +186,13 @@ jobs:
         id: doc-gen
         run: |
           set -x
-          git config --local user.name "[CI/CD]:"
+          git config --local user.name "👮🏻[CI/CD]:"
           git config --local user.email ""
           echo ::set-output name=status::success
 
           currentBranch=${{ needs.infos.outputs.GITHUB_REF }}
-          currentBranch=${currentBranch##*/}
-
+          currentBranch=${currentBranch#refs/heads/*}
           newFeature=${currentBranch}-doc-update
-
-          git checkout -b feature/${newFeature}
 
           yq e -i "
             .version = \"${APP_VERSION}\" |
@@ -206,12 +203,8 @@ jobs:
           
           diff=`git diff |wc -l`
           if [[ $diff != 0 ]]; then
-            git status
             git add .
             git commit -sm "Auto regenerate helm documentation"
-            git checkout ${currentBranch}
-            git merge feature/${newFeature}
-            git branch -d feature/${newFeature}
             git push
             echo ::set-output name=status::error
           fi
@@ -384,19 +377,28 @@ jobs:
     outputs:
       STATUS: ${{ steps.deploy-status.outputs.status }}
 
-  release:
-#    if: ${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' }}
+  publish-release:
     if: contains(github.ref, 'refs/tags/')
     name: "🌏 Release"
     needs: [infos, deploy]
     runs-on: ubuntu-latest
-    container:
-      image: vr00mm/docker-helm-client:v0.1.0
-      env:
-        ENV_VAR: test-helm
     steps:
-      - name: helm dry-run
-        run: helm upgrade install package-version-1.0.0.tgz
+      - name: Load Workspace
+        uses: actions/checkout@v2
+
+      - name: Prepare changelog
+        run: |
+          TAGS=$(git tag -l)
+          if [[ TAGS != "" ]]
+          then
+             git log $(git describe --tags --abbrev=0)..HEAD --oneline |grep -v "[CI/CD]" |grep -v "[NO_LOG]" > changelog.txt
+          else
+             git log HEAD --oneline |grep -v "[CI/CD]" |grep -v "[NO_LOG]" > changelog.txt
+          fi
+
+      - name: Create new release
+        run: |
+          gh create release ${{ needs.infos.outputs.NEXT_VERSION }} --notes-file changelog.txt
 
   post-always:
     name: "🚘 Result"
