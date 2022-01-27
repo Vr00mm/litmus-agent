@@ -34,6 +34,8 @@ subscriber:
     pullPolicy: Always
 
 workflow-controller:
+  crds:
+    create: true
   enabled: true
   image:
     pullPolicy: Always
